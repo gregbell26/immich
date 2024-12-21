@@ -68,6 +68,10 @@ export class AuthService extends BaseService {
         user = null;
       }
     }
+    if (user?.aliased){
+      this.logger.warn(`Attempt sign into aliased user ${dto.email} via password login!`);
+      throw new UnauthorizedException(`Login has been disabled for user ${dto.email}`);
+    }
 
     if (!user) {
       this.logger.warn(`Failed login attempt for user ${dto.email} from ip address ${details.clientIp}`);
@@ -188,9 +192,39 @@ export class AuthService extends BaseService {
   async callback(dto: OAuthCallbackDto, loginDetails: LoginDetails) {
     const { oauth } = await this.getConfig({ withCache: false });
     const profile = await this.oauthRepository.getProfile(oauth, dto.url, this.resolveRedirectUri(oauth, dto.url));
-    const { autoRegister, defaultStorageQuota, storageLabelClaim, storageQuotaClaim } = oauth;
+    const { autoRegister, defaultStorageQuota, storageLabelClaim, storageQuotaClaim, allowAliasedAccounts, aliasedAccountClaim } = oauth;
     this.logger.debug(`Logging in with OAuth: ${JSON.stringify(profile)}`);
     let user = await this.userRepository.getByOAuthId(profile.sub);
+
+    // login via claimed alias
+    if (!user && allowAliasedAccounts && aliasedAccountClaim){
+      // making this a claim instead allows you to have unique accounts with the oauth provider - then you set
+      // what immich account the profile should map to.
+
+      // this technically is less secure as multiple people can access the same account, but this also allows
+      // seamless integration without having to share passwords as some users have done
+      const aliasedAccountName = this.getClaim(profile, {
+        key: aliasedAccountClaim,
+        default: '',
+        isValid: isString,
+      });
+
+      if (aliasedAccountName){
+        user = await this.userRepository.getByEmail(aliasedAccountName);
+      }
+
+      if (!user && aliasedAccountName){
+        // we are assuming that if you have the aliased account claim set,
+        // that you ONLY intend to sign in to aliased accounts
+        throw new BadRequestException(`Attempt to sign into aliased account '${aliasedAccountName}'that does not exist!`)
+      }
+
+      // To hopefully prevent malicious users from signing in to accounts that they don't have access to.
+      if (user && !user.aliased){
+        // we may want to make this a more generic error message?
+        throw new BadRequestException('Attempt to sign into non aliased account!');
+      }
+    }
 
     // link by email
     if (!user && profile.email) {

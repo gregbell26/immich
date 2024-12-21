@@ -35,6 +35,9 @@ export class UserEntity {
   @Column({ default: '' })
   oauthId!: string;
 
+  @Column({ default: false })
+  aliased!: boolean
+
   @Column({ default: '' })
   profileImagePath!: string;
 
