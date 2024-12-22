@@ -47,6 +47,16 @@ export const systemConfigStub = {
       defaultStorageQuota: 1,
     },
   },
+  oauthWithAliases: {
+    oauth: {
+      enabled: true,
+      autoRegister: false,
+      autoLaunch: false,
+      buttonText: 'OAuth',
+      allowAliasedAccounts: true,
+      aliasedAccountClaim: 'aliased_account',
+    }
+  },
   deleteDelay30: {
     user: {
       deleteDelay: 30,

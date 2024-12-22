@@ -111,6 +111,8 @@ const updatedConfig = Object.freeze<SystemConfig>({
     enabled: true,
   },
   oauth: {
+    aliasedAccountClaim: "",
+    allowAliasedAccounts: false,
     autoLaunch: true,
     autoRegister: true,
     buttonText: 'Login with OAuth',

@@ -19,7 +19,7 @@ import { sharedLinkStub } from 'test/fixtures/shared-link.stub';
 import { systemConfigStub } from 'test/fixtures/system-config.stub';
 import { userStub } from 'test/fixtures/user.stub';
 import { newTestService } from 'test/utils';
-import { Mocked } from 'vitest';
+import {expect, Mocked} from 'vitest';
 
 const oauthResponse = {
   accessToken: 'cmFuZG9tLWJ5dGVz',
@@ -121,6 +121,11 @@ describe('AuthService', () => {
       });
       expect(userMock.getByEmail).toHaveBeenCalledTimes(1);
     });
+
+    it('should throw an error if account is an alias', async () => {
+      userMock.getByEmail.mockResolvedValue(userStub.user3);
+      await expect(sut.login(fixtures.login, loginDetails)).rejects.toBeInstanceOf(UnauthorizedException);
+    })
   });
 
   describe('changePassword', () => {
@@ -636,6 +641,56 @@ describe('AuthService', () => {
         quotaSizeInBytes: 5_368_709_120,
         storageLabel: null,
       });
+    });
+
+    it('should not allow access to non aliased accounts', async() => {
+      systemMock.get.mockResolvedValue(systemConfigStub.oauthWithAliases);
+      userMock.getByEmail.mockResolvedValue(userStub.user1);
+      oauthMock.getProfile.mockResolvedValue({sub, email, aliased_account: email});
+
+      await expect(sut.callback({ url: 'http://immich/auth/login?code=abc123' }, loginDetails)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('should not reattempt sign in if oauth profile has alias claim', async () => {
+      systemMock.get.mockResolvedValue(systemConfigStub.oauthWithAliases);
+      userMock.getByEmail.mockResolvedValue(null);
+      oauthMock.getProfile.mockResolvedValue({sub, email, aliased_account: "dne@test.com"});
+
+      await expect(sut.callback({ url: 'http://immich/auth/login?code=abc123' }, loginDetails)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('should not attempt alias sign in if claim is not set', async () => {
+      systemMock.get.mockResolvedValue(systemConfigStub.oauthWithAliases);
+      userMock.getByEmail.mockResolvedValue(userStub.user1);
+      userMock.update.mockResolvedValue(userStub.user1);
+      sessionMock.create.mockResolvedValue(sessionStub.valid);
+      oauthMock.getProfile.mockResolvedValue({sub, email});
+
+      await expect(sut.callback({ url: 'http://immich/auth/login?code=abc123' }, loginDetails)).resolves.toEqual(
+        oauthResponse,
+      );
+    });
+
+    it('should not attempt alias sign in if linked to oauth', async () => {
+      systemMock.get.mockResolvedValue(systemConfigStub.oauthWithAliases);
+      userMock.getByOAuthId.mockResolvedValue(userStub.user1);
+      oauthMock.getProfile.mockResolvedValue({sub, email});
+
+      await expect(sut.callback({ url: 'http://immich/auth/login?code=abc123' }, loginDetails)).resolves.toEqual(
+        oauthResponse,
+      );
+
+      expect(userMock.getByEmail).not.toBeCalled();
+    });
+
+    it('should sign in with alias if claim set', async () => {
+      systemMock.get.mockResolvedValue(systemConfigStub.oauthWithAliases);
+      userMock.getByEmail.mockResolvedValue(userStub.user3);
+      oauthMock.getProfile.mockResolvedValue({sub, email, aliased_account: email});
+
+      await expect(sut.callback({ url: 'http://immich/auth/login?code=abc123' }, loginDetails)).resolves.toEqual(
+        oauthResponse,
+      );
     });
   });
 
