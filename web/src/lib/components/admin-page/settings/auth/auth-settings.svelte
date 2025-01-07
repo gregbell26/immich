@@ -191,6 +191,25 @@
                 isEdited={!(config.oauth.defaultStorageQuota == savedConfig.oauth.defaultStorageQuota)}
               />
 
+              <SettingSwitch
+                title={$t('admin.oauth_aliased_account_enabled').toUpperCase()}
+                subtitle={$t('admin.oauth_aliased_account_enabled_description')}
+                disabled={disabled || !config.oauth.enabled}
+                bind:checked={config.oauth.allowAliasedAccounts}
+              />
+
+              {#if config.oauth.allowAliasedAccounts}
+                <SettingInputField
+                  inputType={SettingInputFieldType.TEXT}
+                  label={$t('admin.oauth_aliased_account_claim').toUpperCase()}
+                  description={$t('admin.oauth_aliased_account_claim_description')}
+                  bind:value={config.oauth.aliasedAccountClaim}
+                  required={true}
+                  disabled={disabled || !config.oauth.enabled}
+                  isEdited={!(config.oauth.aliasedAccountClaim == savedConfig.oauth.aliasedAccountClaim)}
+                />
+              {/if}
+
               <SettingInputField
                 inputType={SettingInputFieldType.TEXT}
                 label={$t('admin.oauth_button_text').toUpperCase()}
